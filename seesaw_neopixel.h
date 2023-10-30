@@ -126,7 +126,6 @@ public:
 
   void showCycle();
   void setPixelColor(uint16_t pixel,  uint32_t *colors, uint8_t color_count, uint32_t period);
-  void dumpCycleConf();
 
 protected:
   boolean is800KHz, // ...true if 800 KHz pixels
