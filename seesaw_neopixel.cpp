@@ -120,6 +120,23 @@ void seesaw_NeoPixel::show(void) {
   endTime = micros(); // Save EOD time for latch on next call
 }
 
+/**************************************************************************/
+/*!
+    @brief  Do the actual cycling. Needs to be run in the loop.
+*/
+/**************************************************************************/
+void seesaw_NeoPixel::showCycle() {
+  for(uint16_t pixel = 0; pixel < numLEDs; pixel++) {
+    if(color_cycle[pixel].period && (millis() - color_cycle[pixel].last_ts) > color_cycle[pixel].period) {
+      color_cycle[pixel].current_color = (color_cycle[pixel].current_color+1) % color_cycle[pixel].color_count;
+      color_cycle[pixel].last_ts = millis();
+      deactivateCycling = false;
+      seesaw_NeoPixel::setPixelColor(pixel, color_cycle[pixel].color_list[color_cycle[pixel].current_color]);
+    }
+  }
+  show();
+}
+
 // Set the output pin number
 void seesaw_NeoPixel::setPin(uint8_t p) {
   this->write8(SEESAW_NEOPIXEL_BASE, SEESAW_NEOPIXEL_PIN, p);
@@ -195,6 +212,13 @@ void seesaw_NeoPixel::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b,
 // Set pixel color from 'packed' 32-bit RGB color:
 void seesaw_NeoPixel::setPixelColor(uint16_t n, uint32_t c) {
   if (n < numLEDs) {
+
+    if(deactivateCycling) {
+      color_cycle[n].period = 0; // Deactivate cycling
+    }
+
+    deactivateCycling = true;
+
     uint8_t *p, r = (uint8_t)(c >> 16), g = (uint8_t)(c >> 8), b = (uint8_t)c;
     if (brightness) { // See notes in setBrightness()
       r = (r * brightness) >> 8;
@@ -223,6 +247,31 @@ void seesaw_NeoPixel::setPixelColor(uint16_t n, uint32_t c) {
     this->write(SEESAW_NEOPIXEL_BASE, SEESAW_NEOPIXEL_BUF, writeBuf, len + 2);
   }
 }
+
+/**************************************************************************/
+/*!
+    @brief  Configure a pixel to cycle through predefined colors
+    @param  n pixel id to cycle
+    @param  colors array of colors to cycle through
+    @param  color_count  number of colors in array
+    @param  period duration of one color in ms
+*/
+/**************************************************************************/
+void seesaw_NeoPixel::setPixelColor(uint16_t n, uint32_t *colors, uint8_t color_count, uint32_t period) {
+
+    if(n > numLEDs) return; // Not sure why we get pixels > numLEDS...
+
+    color_cycle[n].color_list = colors;
+    color_cycle[n].last_ts = millis();
+    color_cycle[n].period = period;
+    color_cycle[n].current_color = colors[0];
+    color_cycle[n].color_count = color_count;
+    
+    deactivateCycling = false;
+
+    setPixelColor(n, colors[0]); // Setting first color
+}
+
 
 // Convert separate R,G,B into packed 32-bit RGB color.
 // Packed format is always RGB, regardless of LED strand color order.

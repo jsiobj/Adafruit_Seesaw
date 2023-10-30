@@ -25,6 +25,11 @@
 
 typedef void (*TrellisCallback)(keyEvent evt);
 
+#define get_bit(value, bit)    (value >> bit) & (uint16_t)1
+#define set_bit(value, bit)    value = value | ((uint16_t)1 << bit)
+#define unset_bit(value, bit)  value = value & ~((uint16_t)1 << bit)
+#define toggle_bit(value, bit) value = value ^ ((uint16_t)1 << bit)
+
 /**************************************************************************/
 /*!
     @brief  Class that stores state and functions for interacting with the
@@ -42,6 +47,15 @@ public:
   void registerCallback(uint8_t key, TrellisCallback (*cb)(keyEvent));
   void unregisterCallback(uint8_t key);
 
+  void registerCustomCallback(uint8_t key, TrellisCallback (*cb)(keyEvent));
+  void unregisterCustomCallback(uint8_t key);
+
+  void setLongPressDelay(long delay) { long_press_delay = delay; };
+  void setLongPress(uint8_t key) { set_bit(was_long_press, key); }
+  void unsetLongPress(uint8_t key) { unset_bit(was_long_press, key); }
+  bool wasLongPressed(uint8_t key) { return get_bit(was_long_press, key); }
+
+
   void activateKey(uint8_t key, uint8_t edge, bool enable = true);
 
   void read(bool polling = true);
@@ -52,9 +66,15 @@ public:
                                       ///< by aggregate class
 
 protected:
+  unsigned long long_press_delay = 3000;  // How much should we wait until we consider a long press
+  unsigned long last_press_ts[NEO_TRELLIS_NUM_KEYS] = {0}; // Timestamp when key was pressed (reset to 0 when released)
+  uint16_t was_long_press; // "register" that store wether keys where long pressed
+
   uint8_t _addr; ///< the I2C address of this board
   TrellisCallback (*_callbacks[NEO_TRELLIS_NUM_KEYS])(
       keyEvent); ///< the array of callback functions
+
+  TrellisCallback (*_customCallbacks[NEO_TRELLIS_NUM_KEYS])(keyEvent) = { NULL };
 };
 
 /**************************************************************************/

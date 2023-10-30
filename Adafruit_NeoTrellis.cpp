@@ -65,6 +65,31 @@ void Adafruit_NeoTrellis::unregisterCallback(uint8_t key) {
 
 /**************************************************************************/
 /*!
+    @brief  register a custom callback function on the passed key for
+            long press and double clicks
+    @param  key the key number to register the callback on
+    @param  cb the callback function that should be called when an event on that
+            key happens
+*/
+/**************************************************************************/
+void Adafruit_NeoTrellis::registerCustomCallback(uint8_t key, 
+                                               TrellisCallback (*cb)(keyEvent)) {
+    _customCallbacks[key] = cb;
+}
+
+/**************************************************************************/
+/*!
+    @brief  unregister a callback on a given key for
+            long press and double clicks
+    @param  key the key number the callback is currently mapped to.
+*/
+/**************************************************************************/
+void Adafruit_NeoTrellis::unregisterCustomCallback(uint8_t key) {
+    _customCallbacks[key] = NULL;
+}
+
+/**************************************************************************/
+/*!
     @brief  activate or deactivate a given key event
     @param  key the key number to map the event to
     @param  edge the edge sensitivity of the event
@@ -84,6 +109,21 @@ void Adafruit_NeoTrellis::activateKey(uint8_t key, uint8_t edge, bool enable) {
 */
 /**************************************************************************/
 void Adafruit_NeoTrellis::read(bool polling) {
+
+  // Before getting new original events, checking for long press
+  for(uint16_t key=0; key<NEO_TRELLIS_NUM_KEYS; key++) {
+    // call any custom callbacks associated with the key
+    if(_customCallbacks[key] != NULL && last_press_ts[key] &&
+      (millis() - last_press_ts[key]) > long_press_delay ) {
+
+      keyEvent customEvt = { SEESAW_KEYPAD_EDGE_LONG, key };
+      last_press_ts[key] = 0;
+      _customCallbacks[key](customEvt);
+      setLongPress(key);
+    }
+  }
+
+  // Then getting original events in trellis FIFO
   uint8_t count = getKeypadCount();
   delayMicroseconds(500);
   if (count > 0) {
@@ -92,12 +132,24 @@ void Adafruit_NeoTrellis::read(bool polling) {
     keyEventRaw e[count];
     readKeypad(e, count);
     for (int i = 0; i < count; i++) {
-      // call any callbacks associated with the key
       e[i].bit.NUM = NEO_TRELLIS_SEESAW_KEY(e[i].bit.NUM);
-      if (e[i].bit.NUM < NEO_TRELLIS_NUM_KEYS &&
-          _callbacks[e[i].bit.NUM] != NULL) {
-        keyEvent evt = {e[i].bit.EDGE, e[i].bit.NUM};
-        _callbacks[e[i].bit.NUM](evt);
+      if(e[i].bit.NUM < NEO_TRELLIS_NUM_KEYS) {
+        // Setting timers for long press and double click detection 
+        // BEFORE calling original callback
+        if(e[i].bit.EDGE == SEESAW_KEYPAD_EDGE_RISING) {
+          last_press_ts[e[i].bit.NUM] = millis();
+        }
+        // call any original callbacks associated with the key
+        if (_callbacks[e[i].bit.NUM] != NULL) {
+          keyEvent evt = {e[i].bit.EDGE, e[i].bit.NUM};
+          _callbacks[e[i].bit.NUM](evt);
+        }
+        // re-setting timers for long press detection 
+        // AFTER calling original callback
+        if(e[i].bit.EDGE == SEESAW_KEYPAD_EDGE_FALLING) {
+          last_press_ts[e[i].bit.NUM] = 0;
+          unsetLongPress(e[i].bit.NUM);
+        }
       }
     }
   }

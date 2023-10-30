@@ -146,6 +146,7 @@ enum {
   SEESAW_KEYPAD_EDGE_LOW,
   SEESAW_KEYPAD_EDGE_FALLING,
   SEESAW_KEYPAD_EDGE_RISING,
+  SEESAW_KEYPAD_EDGE_LONG,    // New "event" for long press detection
 };
 
 /** encoder module edge definitions
