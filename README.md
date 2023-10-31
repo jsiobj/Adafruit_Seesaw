@@ -61,5 +61,6 @@ void setup () {
     trellis.registerCustomCallback(KEY, onLongPress);
 }
 ```
+Full exampe in example/blink_long_press
 
 Check out the [documentation](https://adafruit.github.io/Adafruit_Seesaw/html/class_adafruit__seesaw.html) for a listing and explanation of other available methods!
