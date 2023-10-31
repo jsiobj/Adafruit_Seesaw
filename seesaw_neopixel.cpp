@@ -127,11 +127,24 @@ void seesaw_NeoPixel::show(void) {
 /**************************************************************************/
 void seesaw_NeoPixel::showCycle() {
   for(uint16_t pixel = 0; pixel < numLEDs; pixel++) {
-    if(color_cycle[pixel].period && (millis() - color_cycle[pixel].last_ts) > color_cycle[pixel].period) {
-      color_cycle[pixel].current_color = (color_cycle[pixel].current_color+1) % color_cycle[pixel].color_count;
-      color_cycle[pixel].last_ts = millis();
+    
+    if(pixel_state[pixel].enabled && (millis() - pixel_state[pixel].last_ts) > pixel_state[pixel].period) {
+
       deactivateCycling = false;
-      seesaw_NeoPixel::setPixelColor(pixel, color_cycle[pixel].color_list[color_cycle[pixel].current_color]);
+      pixel_state[pixel].last_ts = millis();
+
+      // Cycling
+      if(pixel_state[pixel].color_count) {
+        pixel_state[pixel].current_color = (pixel_state[pixel].current_color+1) % pixel_state[pixel].color_count;
+        pixel_state[pixel].last_ts = millis();
+        seesaw_NeoPixel::setPixelColor(pixel, pixel_state[pixel].color_list[pixel_state[pixel].current_color]);
+      }
+      
+      // Blinking
+      else {
+        if(getPixelColor(pixel)!=0) seesaw_NeoPixel::setPixelColor(pixel, 0);
+        else                        seesaw_NeoPixel::setPixelColor(pixel, pixel_state[pixel].main_color);
+      }
     }
   }
   show();
@@ -214,7 +227,8 @@ void seesaw_NeoPixel::setPixelColor(uint16_t n, uint32_t c) {
   if (n < numLEDs) {
 
     if(deactivateCycling) {
-      color_cycle[n].period = 0; // Deactivate cycling
+      pixel_state[n].enabled = false;
+      pixel_state[n].main_color = c;
     }
 
     deactivateCycling = true;
@@ -257,21 +271,48 @@ void seesaw_NeoPixel::setPixelColor(uint16_t n, uint32_t c) {
     @param  period duration of one color in ms
 */
 /**************************************************************************/
-void seesaw_NeoPixel::setPixelColor(uint16_t n, uint32_t *colors, uint8_t color_count, uint32_t period) {
+void seesaw_NeoPixel::setCycle(uint16_t n, uint32_t *colors, uint8_t color_count, uint32_t period, bool enable) {
 
     if(n > numLEDs) return; // Not sure why we get pixels > numLEDS...
 
-    color_cycle[n].color_list = colors;
-    color_cycle[n].last_ts = millis();
-    color_cycle[n].period = period;
-    color_cycle[n].current_color = colors[0];
-    color_cycle[n].color_count = color_count;
-    
-    deactivateCycling = false;
+    pixel_state[n].color_list = colors;
+    pixel_state[n].last_ts = millis();
+    pixel_state[n].period = period;
+    pixel_state[n].current_color = colors[0];
+    pixel_state[n].color_count = color_count;
+    pixel_state[n].mode = CYCLE_MODE_CYCLE;
+    pixel_state[n].enabled = enable;
 
-    setPixelColor(n, colors[0]); // Setting first color
+    
+    if(enable) {
+      deactivateCycling = false;
+      setPixelColor(n, colors[0]); // Setting first color
+    }
 }
 
+/**************************************************************************/
+/*!
+    @brief  Configure a pixel to blink
+    @param  n pixel id to cycle
+    @param  period duration of one color in ms
+*/
+/**************************************************************************/
+void seesaw_NeoPixel::setBlink(uint16_t n, uint32_t color, uint32_t period, bool enable) {
+
+    if(n > numLEDs) return; // Not sure why we get pixels > numLEDS...
+
+    pixel_state[n].last_ts = millis();
+    pixel_state[n].period = period;
+    pixel_state[n].color_count = 0;
+    pixel_state[n].main_color = color;
+    pixel_state[n].mode = CYCLE_MODE_BLINK;
+    pixel_state[n].enabled = enable;
+    
+    if(enable) {
+      deactivateCycling = false;
+      setPixelColor(n, 0x0); // Off
+    }
+}
 
 // Convert separate R,G,B into packed 32-bit RGB color.
 // Packed format is always RGB, regardless of LED strand color order.

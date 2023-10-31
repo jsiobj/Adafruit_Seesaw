@@ -91,13 +91,22 @@
 
 typedef uint16_t neoPixelType;
 
+enum {
+  CYCLE_MODE_NONE = 0,
+  CYCLE_MODE_BLINK,
+  CYCLE_MODE_CYCLE,
+};
+
 // Blinking config and state struct
-struct color_cycle_t {
-    uint32_t period;        // Cycling period (color will change every period ms)
-    uint8_t color_count;    // Nb of colors in cycle
-    uint8_t current_color;  // Index of current color in color list
-    uint32_t *color_list;   // Color list
-    uint32_t last_ts;       // last time color cycled
+struct pixel_state_t {
+    uint32_t period = 0;                // Cycling period (color will change every period ms)
+    uint8_t color_count;                // Nb of colors in cycle
+    uint8_t current_color;              // Index of current color in color list
+    uint32_t *color_list;               // Color list
+    uint32_t main_color = 0xFFFFFF ;    // Color to user when cycling stops
+    uint32_t last_ts = 0;               // last time color cycled
+    uint8_t mode;                       // Cycling mode
+    bool enabled;                       // Cycling or not cycling...
 };
 
 /** Adafruit_NeoPixel-compatible 'wrapper' for LED control over seesaw
@@ -125,7 +134,12 @@ public:
   inline bool canShow(void) { return (micros() - endTime) >= 300L; }
 
   void showCycle();
-  void setPixelColor(uint16_t pixel,  uint32_t *colors, uint8_t color_count, uint32_t period);
+  void setMode(uint16_t pixel, uint8_t mode, bool enable = true) { pixel_state[pixel].mode = mode; pixel_state[pixel].enabled = enable; }
+  void setCycle(uint16_t pixel,  uint32_t *colors, uint8_t color_count, uint32_t period, bool enable = true);
+  void setBlink(uint16_t pixel,  uint32_t color, uint32_t period, bool enable = true); 
+  bool deactivateCycling = true;
+  void enableCycling(uint16_t pixel, bool enable) { deactivateCycling= !enable; pixel_state[pixel].enabled = enable; setPixelColor(pixel, pixel_state[pixel].main_color); }
+  bool isCyclingEnabled(uint16_t pixel) { return pixel_state[pixel].enabled; }
 
 protected:
   boolean is800KHz, // ...true if 800 KHz pixels
@@ -143,8 +157,7 @@ protected:
 
   uint16_t type;
 
-  color_cycle_t color_cycle[16];
-  bool deactivateCycling = true;
+  pixel_state_t pixel_state[16];
 };
 
 #endif // seesaw_NeoPixel_H
